@@ -22,7 +22,7 @@
                 </div>
                 <div class="form-group">
                     <label for="campaignName">Campaign Name</label>
-                    <input type="text" id="campaignName" placeholder="例: 0627_直播_直式">
+                    <input type="text" id="campaignName" placeholder="例: MMDD_直播_X式">
                 </div>
                 <div class="form-group">
                     <label for="destinationUrl">Destination URL</label>
@@ -41,8 +41,8 @@
                     <textarea id="apiResponse" placeholder='貼上圖片上傳 API 的回應 JSON...'></textarea>
                 </div>
                 <div class="btn-group">
-                    <button class="btn" onclick="startAutoCapture()">🔄 自動監聽</button>
-                    <button class="btn btn-secondary" onclick="stopAutoCapture()">⏹️ 停止</button>
+                    <button class="btn" onclick="startAutoCapture()">自動監聽</button>
+                    <button class="btn btn-secondary" onclick="stopAutoCapture()">停止</button>
                 </div>
                 <div id="captureStatus" style="margin-top: 8px; font-size: 12px; color: #6b7280;"></div>
             </div>
@@ -95,7 +95,7 @@
             </div>
             <div id="templateEditorContent"></div>
             <div class="btn-group" style="margin-top: 16px;">
-                <button class="btn" onclick="saveTemplates()">💾 儲存版型</button>
+                <button class="btn" onclick="saveTemplates()">儲存版型</button>
                 <button class="btn btn-secondary" onclick="closeTemplateEditor()">取消</button>
             </div>
         </div>
@@ -164,7 +164,7 @@
             </div>
             <div id="confirmContent"></div>
             <div class="btn-group" style="margin-top: 16px;">
-                <button class="btn" onclick="finalGenerate()">✅ 確認生成</button>
+                <button class="btn" onclick="finalGenerate()">確認生成</button>
                 <button class="btn btn-danger" onclick="closeConfirmModal()">取消</button>
             </div>
         </div>
@@ -194,7 +194,6 @@
         let activeStatusTemplates = [];
         let isStatusEditMode = false;
         
-        // 本地存儲功能
         function saveTemplatesToStorage() {
             localStorage.setItem('liveStreamTemplates', JSON.stringify(templates));
             localStorage.setItem('activeStatusTemplates', JSON.stringify(activeStatusTemplates));
@@ -220,6 +219,45 @@
             return allDimensions.filter((item, index, self) => 
                 index === self.findIndex(t => t.width === item.width && t.height === item.height)
             );
+        }
+        
+        function detectTypeFromFilenames(images) {
+            let verticalCount = 0;
+            let horizontalCount = 0;
+            let unclearCount = 0;
+            let verticalFiles = [];
+            let horizontalFiles = [];
+            
+            images.forEach(img => {
+                if (img.filename && img.filename.includes('直式')) {
+                    verticalCount++;
+                    verticalFiles.push(img.filename);
+                } else if (img.filename && img.filename.includes('橫式')) {
+                    horizontalCount++;
+                    horizontalFiles.push(img.filename);
+                } else {
+                    unclearCount++;
+                }
+            });
+            
+            const type = verticalCount > 0 && horizontalCount > 0 ? 'mixed' :
+                         verticalCount > horizontalCount ? 'vertical' :
+                         horizontalCount > verticalCount ? 'horizontal' : null;
+            
+            return {
+                type: type,
+                verticalFiles: verticalFiles,
+                horizontalFiles: horizontalFiles,
+                verticalCount: verticalCount,
+                horizontalCount: horizontalCount,
+                unclearCount: unclearCount
+            };
+        }
+        
+        function detectTypeFromName(name) {
+            if (name.includes('直式')) return 'vertical';
+            if (name.includes('橫式')) return 'horizontal';
+            return null;
         }
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -269,10 +307,8 @@
             }).join('');
         }
         
-        // 新增版型功能
         function addNewTemplate() {
             document.getElementById('addTemplateModal').style.display = 'block';
-            // 清空表單
             document.getElementById('newTemplateWidth').value = '';
             document.getElementById('newTemplateHeight').value = '';
             document.getElementById('newTemplateLeft').value = '0';
@@ -299,7 +335,6 @@
                 return;
             }
             
-            // 檢查是否已存在相同尺寸
             const exists = templates[type].some(t => t.width === width && t.height === height);
             if (exists) {
                 alert('該尺寸已存在於此版型中！');
@@ -318,7 +353,7 @@
             };
             
             templates[type].push(newTemplate);
-            activeStatusTemplates = [...getUniqueTemplates()]; // 重新計算
+            activeStatusTemplates = [...getUniqueTemplates()];
             
             saveTemplatesToStorage();
             updateTemplatesDisplay();
@@ -327,7 +362,6 @@
             alert('新版型已新增！');
         }
 
-        // 狀態編輯功能
         function toggleStatusEditMode() {
             isStatusEditMode = !isStatusEditMode;
             const editBtn = document.getElementById('statusEditBtn');
@@ -380,10 +414,8 @@
             toggleStatusEditMode();
         }
 
-        // 修正重置功能 - 只重置狀態檢查，不刪除用戶版型
         function resetToDefaultTemplates() {
             if (confirm('確定要重置匹配狀態為預設的5種版型檢查嗎？（不會刪除您新增的版型）')) {
-                // 只重置預設的5種版型作為狀態檢查
                 const defaultTemplates = [
                     { width: 970, height: 250 },
                     { width: 300, height: 250 },
@@ -399,10 +431,8 @@
             }
         }
 
-        // 新增：完全重置功能（如果真的需要）
         function resetAllTemplates() {
             if (confirm('⚠️ 警告：這將刪除所有自訂版型，重置為原始狀態！\n確定要繼續嗎？')) {
-                // 重置為原始預設版型
                 templates = {
                     horizontal: [
                         { width: 970, height: 250, liveStreamBox: { left: 301, top: 6, width: 368, height: 240 } },
@@ -426,25 +456,6 @@
                 updateStatus();
                 alert('已完全重置為預設版型！');
             }
-        }
-        
-        function detectTypeFromFilenames(images) {
-            let verticalCount = 0;
-            let horizontalCount = 0;
-            
-            images.forEach(img => {
-                if (img.filename && img.filename.includes('直式')) verticalCount++;
-                if (img.filename && img.filename.includes('橫式')) horizontalCount++;
-            });
-            
-            return verticalCount > horizontalCount ? 'vertical' : 
-                   horizontalCount > verticalCount ? 'horizontal' : null;
-        }
-        
-        function detectTypeFromName(name) {
-            if (name.includes('直式')) return 'vertical';
-            if (name.includes('橫式')) return 'horizontal';
-            return null;
         }
         
         function validateAndGenerate() {
@@ -475,21 +486,36 @@
                     return;
                 }
                 
-                const imageType = detectTypeFromFilenames(currentImages);
+                const imageTypeResult = detectTypeFromFilenames(currentImages);
                 const nameType = detectTypeFromName(campaignName);
+                
+                if (imageTypeResult.type === 'mixed') {
+                    let mixedMessage = `⚠️ 檢測到圖片中同時包含直式和橫式檔名！\n\n`;
+                    mixedMessage += `直式檔案 (${imageTypeResult.verticalCount}個):\n`;
+                    mixedMessage += imageTypeResult.verticalFiles.map(f => `• ${f}`).join('\n') + '\n\n';
+                    mixedMessage += `橫式檔案 (${imageTypeResult.horizontalCount}個):\n`;
+                    mixedMessage += imageTypeResult.horizontalFiles.map(f => `• ${f}`).join('\n') + '\n\n';
+                    mixedMessage += `請檢查檔案命名是否正確，確保所有檔案使用相同的類型標示。`;
+                    
+                    alert(mixedMessage);
+                    return;
+                }
+                
+                const imageType = imageTypeResult.type;
                 
                 if (imageType && nameType && imageType !== nameType) {
                     const imageTypeName = imageType === 'vertical' ? '直式' : '橫式';
                     const nameTypeName = nameType === 'vertical' ? '直式' : '橫式';
                     
-                    if (!confirm(`檢測到類型不一致:\n圖片檔名顯示: ${imageTypeName}\nCampaign Name 顯示: ${nameTypeName}\n\n點擊確定使用圖片檔名的類型 (${imageTypeName})，點擊取消重新檢查。`)) {
+                    const totalFiles = imageTypeResult.verticalCount + imageTypeResult.horizontalCount;
+                    if (!confirm(`檢測到類型不一致:\n圖片檔名顯示: ${imageTypeName} (${totalFiles}個檔案)\nCampaign Name 顯示: ${nameTypeName}\n\n點擊確定使用圖片檔名的類型 (${imageTypeName})，點擊取消重新檢查。`)) {
                         return;
                     }
                 }
                 
                 const missingImages = checkMissingImages(currentImages);
                 if (missingImages.length > 0) {
-                    if (!confirm(`缺少以下尺寸的圖片:\n${missingImages.map(s => `${s.width}×${s.height}`).join('\n')}\n\n請確認是否要繼續生成（缺少的尺寸將保持空白）？`)) {
+                    if (!confirm(`缺少以下尺寸的圖片:\n${missingImages.map(s => `${s.width}×${s.height}`).join('\n')}\n\n請確認是否要繼續生成（缺少的尺寸將被跳過）？`)) {
                         return;
                     }
                 }
@@ -497,7 +523,8 @@
                 showFinalConfirmation();
                 
             } catch (error) {
-                alert('API Response JSON 格式錯誤！');
+                console.error('JSON 解析錯誤:', error);
+                alert('API Response JSON 格式錯誤！請檢查 JSON 格式是否正確。');
             }
         }
         
@@ -510,7 +537,8 @@
         
         function checkMissingImages(images) {
             const campaignName = document.getElementById('campaignName').value;
-            const imageType = detectTypeFromFilenames(images) || detectTypeFromName(campaignName) || 'vertical';
+            const imageTypeResult = detectTypeFromFilenames(images);
+            const imageType = imageTypeResult.type || detectTypeFromName(campaignName) || 'vertical';
             const requiredSizes = templates[imageType];
             
             return requiredSizes.filter(size => 
@@ -520,19 +548,40 @@
         
         function showFinalConfirmation() {
             const campaignName = document.getElementById('campaignName').value;
-            const imageType = detectTypeFromFilenames(currentImages) || detectTypeFromName(campaignName) || 'vertical';
+            const imageTypeResult = detectTypeFromFilenames(currentImages);
+            const imageType = imageTypeResult.type || detectTypeFromName(campaignName) || 'vertical';
             const typeName = imageType === 'vertical' ? '直式' : '橫式';
-            const matchedCount = countMatchedImages();
-            const totalCount = templates[imageType].length;
+            
+            const templateData = templates[imageType];
+            const actualMatches = templateData.filter(template => 
+                currentImages.some(img => img.width === template.width && img.height === template.height)
+            );
+            
+            const matchedCount = actualMatches.length;
+            const totalCount = templateData.length;
+            
+            const matchedList = actualMatches.map(t => `${t.width}×${t.height}`).join(', ');
+            
+            let fileAnalysis = '';
+            if (imageTypeResult.type) {
+                const totalFiles = imageTypeResult.verticalCount + imageTypeResult.horizontalCount;
+                fileAnalysis = `<br>檔案分析: ${totalFiles}個${typeName}檔案`;
+                if (imageTypeResult.unclearCount > 0) {
+                    fileAnalysis += `，${imageTypeResult.unclearCount}個未標示類型`;
+                }
+            }
             
             document.getElementById('confirmContent').innerHTML = `
                 <div class="success">
                     <strong>配置摘要：</strong><br>
                     Campaign: ${campaignName}<br>
-                    類型: ${typeName}<br>
+                    類型: ${typeName}${fileAnalysis}<br>
                     匹配狀態: ${matchedCount}/${totalCount}<br>
-                    VideoOrientation: ${imageType === 'vertical' ? 'PORTRAIT' : 'LANDSCAPE'}
+                    VideoOrientation: ${imageType === 'vertical' ? 'PORTRAIT' : 'LANDSCAPE'}<br><br>
+                    <strong>實際會生成的版型：</strong><br>
+                    ${matchedList || '無'}
                 </div>
+                <p>⚠️ 注意：只會生成有匹配圖片的版型，未匹配的版型將被跳過。</p>
                 <p>確認以上資料無誤後，點擊確認生成最終配置檔案。</p>
             `;
             
@@ -541,7 +590,8 @@
         
         function countMatchedImages() {
             const campaignName = document.getElementById('campaignName').value;
-            const imageType = detectTypeFromFilenames(currentImages) || detectTypeFromName(campaignName) || 'vertical';
+            const imageTypeResult = detectTypeFromFilenames(currentImages);
+            const imageType = imageTypeResult.type || detectTypeFromName(campaignName) || 'vertical';
             const requiredSizes = templates[imageType];
             
             return requiredSizes.filter(size => 
@@ -555,22 +605,34 @@
             const destinationUrl = document.getElementById('destinationUrl').value;
             const facebookVideoUrl = document.getElementById('facebookVideoUrl').value;
             
-            const imageType = detectTypeFromFilenames(currentImages) || detectTypeFromName(campaignName) || 'vertical';
+            const imageTypeResult = detectTypeFromFilenames(currentImages);
+            const imageType = imageTypeResult.type || detectTypeFromName(campaignName) || 'vertical';
             const templateData = templates[imageType];
             
-            const backgroundImages = templateData.map(template => {
-                const matchingImage = currentImages.find(img => 
-                    img.width === template.width && img.height === template.height
-                );
-                
-                return {
-                    imageId: matchingImage ? matchingImage.id : "",
-                    destinationUrl: destinationUrl,
-                    displayedDimensions: { width: template.width, height: template.height },
-                    liveStreamBox: template.liveStreamBox,
-                    impressionTrackingTags: []
-                };
-            });
+            const backgroundImages = templateData
+                .map(template => {
+                    const matchingImage = currentImages.find(img => 
+                        img.width === template.width && img.height === template.height
+                    );
+                    
+                    if (matchingImage) {
+                        return {
+                            imageId: matchingImage.id,
+                            destinationUrl: destinationUrl,
+                            displayedDimensions: { width: template.width, height: template.height },
+                            liveStreamBox: template.liveStreamBox,
+                            impressionTrackingTags: []
+                        };
+                    }
+                    return null;
+                })
+                .filter(item => item !== null);
+            
+            if (backgroundImages.length === 0) {
+                alert('沒有任何版型匹配到圖片！請檢查圖片尺寸或版型設定。');
+                closeConfirmModal();
+                return;
+            }
             
             const result = {
                 input: {
@@ -670,7 +732,7 @@
                 templates[type].splice(index, 1);
                 activeStatusTemplates = [...getUniqueTemplates()];
                 saveTemplatesToStorage();
-                openTemplateEditor(); // 重新打開編輯器以更新顯示
+                openTemplateEditor();
                 updateTemplatesDisplay();
                 updateStatus();
             }
